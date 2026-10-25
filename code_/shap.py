@@ -6,6 +6,9 @@
 @IDE ：PyCharm
 """
 # -*- coding: utf-8 -*-
+from sklearn.preprocessing import RobustScaler
+from sklearn.model_selection import StratifiedGroupKFold
+
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
@@ -58,13 +61,37 @@ fold_mcc = []
 fold_records = []
 all_shap_values = np.zeros((len(X), X.shape[1]), dtype=float)
 all_base_values = np.zeros(len(X), dtype=float)
-for k, (train_index, test_index) in enumerate(
-        skf.split(X=X, y=y, groups=groups)):
+class Winsorizer:
+
+    def __init__(self, lower=0.01, upper=0.01):
+        self.lower = lower
+        self.upper = upper
+
+    def fit(self, X):
+        self.lower_bounds_ = X.quantile(self.lower)
+        self.upper_bounds_ = X.quantile(1 - self.upper)
+        return self
+
+    def transform(self, X):
+        return X.clip(
+            lower=self.lower_bounds_,
+            upper=self.upper_bounds_,
+            axis=1
+        )
+for k, (train_index, test_index) in enumerate(skf.split(X=X, y=y, groups=groups)):
     print(f'\n========== Fold {k + 1} / {splits_num} ==========')
     X_train = X.iloc[train_index].copy()
     X_test = X.iloc[test_index].copy()
     y_train = y.iloc[train_index].copy()
     y_test = y.iloc[test_index].copy()
+    winsorizer = Winsorizer(lower=0.01,upper=0.01)
+    winsorizer.fit(X_train)
+    X_train = winsorizer.transform(X_train)
+    X_test = winsorizer.transform(X_test)
+    scaler = RobustScaler()
+    scaler.fit(X_train)
+    X_train = pd.DataFrame(scaler.transform(X_train),columns=X.columns,index=X_train.index)
+    X_test = pd.DataFrame(scaler.transform(X_test),columns=X.columns,index=X_test.index)
     model = clone(base_model)
     model.fit(X_train, y_train)
     y_pred = np.asarray(model.predict(X_test)).reshape(-1)
@@ -75,11 +102,7 @@ for k, (train_index, test_index) in enumerate(
     f1 = f1_score(y_test, y_pred, zero_division=0)
     auc_value = roc_auc_score(y_test, y_prob)
     mcc = matthews_corrcoef(y_test, y_pred)
-    tn, fp, fn, tp = confusion_matrix(
-        y_test,
-        y_pred,
-        labels=[0, 1]
-    ).ravel()
+    tn, fp, fn, tp = confusion_matrix(y_test,y_pred,labels=[0, 1]).ravel()
     specificity = tn / (tn + fp) if (tn + fp) > 0 else np.nan
     fold_accuracy.append(acc)
     fold_precision.append(pre)
@@ -337,7 +360,7 @@ for i, feature in enumerate(top3_features):
 
     # 与你的示例图保持一致
     ax1.set_ylabel(
-        'Frequency',
+        'Density',
         fontsize=12
     )
 
@@ -541,8 +564,7 @@ if len(positive_positions) > 0:
 
 
 negative_positions = np.where(
-    rep_y.to_numpy() == 0
-)[0]
+    (rep_y.to_numpy() == 0))[0]
 
 if len(negative_positions) > 0:
 
@@ -724,7 +746,6 @@ benign_decision_path = os.path.join(
 
 if len(negative_positions) > 0:
 
-    # 与前面的 benign waterfall 使用同一个病例
     benign_position = int(negative_pos)
 
     print(
