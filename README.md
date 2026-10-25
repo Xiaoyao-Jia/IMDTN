@@ -4,9 +4,9 @@
 # Tools
 
 
-* Anaconda (Python 3.7)
+* Anaconda (Python 3.9)
 * PyCharm 2021.1
-* scikit-learn 0.24.21
+* scikit-learn 1.6.1
 
 
 # How to use
