@@ -73,8 +73,7 @@ classfiers = {
     # 'TabMClassifier': TabM_D_Classifier(random_state=random_seed, n_cv=1)
 }
 
-# train_pd = pd.read_csv('../data_/prodata.csv', encoding='utf-8')
-train_pd = pd.read_csv('../data_/thyroid_clean.csv')
+train_pd = pd.read_csv('../data_/prodata.csv', encoding='utf-8')
 feature_cols = [col for col in train_pd.columns if col not in ['id', 'mal']]
 X = train_pd[feature_cols]
 y = train_pd['mal']
